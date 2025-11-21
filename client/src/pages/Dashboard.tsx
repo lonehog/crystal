@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { TrendingUp, Briefcase, Clock, RefreshCw } from 'lucide-react'
+import { TrendingUp, Briefcase, RefreshCw } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import { motion } from 'framer-motion'
 import { api } from '../lib/api'
 import GlassCard from '../components/GlassCard'
+import { SkeletonKPICard, SkeletonChart } from '../components/SkeletonLoader'
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -47,61 +48,69 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <GlassCard>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Total Jobs</p>
-              <p className="text-3xl font-bold text-white">
-                {isLoading ? '...' : stats?.total.toLocaleString() || 0}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-electric-blue/20 rounded-lg flex items-center justify-center">
-              <Briefcase className="text-electric-blue" size={24} />
-            </div>
-          </div>
-        </GlassCard>
+        {isLoading ? (
+          <>
+            <SkeletonKPICard />
+            <SkeletonKPICard />
+            <SkeletonKPICard />
+          </>
+        ) : (
+          <>
+            <GlassCard>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Total Jobs</p>
+                  <p className="text-3xl font-bold text-white">
+                    {stats?.total.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-electric-blue/20 rounded-lg flex items-center justify-center">
+                  <Briefcase className="text-electric-blue" size={24} />
+                </div>
+              </div>
+            </GlassCard>
 
-        <GlassCard delay={0.1}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">New Jobs (24h)</p>
-              <p className="text-3xl font-bold text-white">
-                {isLoading ? '...' : stats?.last24h.toLocaleString() || 0}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="text-green-400" size={24} />
-            </div>
-          </div>
-        </GlassCard>
+            <GlassCard delay={0.1}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">New Jobs (24h)</p>
+                  <p className="text-3xl font-bold text-white">
+                    {stats?.last24h.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="text-green-400" size={24} />
+                </div>
+              </div>
+            </GlassCard>
 
-        <GlassCard delay={0.2}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Next Scan</p>
-              <p className="text-lg font-semibold text-white">
-                {nextScanLoading ? '...' : nextScan?.formatted || '--'}
-              </p>
-              {nextScan && (
-                <p className="text-xs text-gray-500 mt-1">
-                  in {nextScan.minutesUntil} min
-                </p>
-              )}
-            </div>
-            <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <RefreshCw className="text-purple-400" size={24} />
-            </div>
-          </div>
-        </GlassCard>
+            <GlassCard delay={0.2}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Next Scan</p>
+                  <p className="text-lg font-semibold text-white">
+                    {nextScanLoading ? '...' : nextScan?.formatted || '--'}
+                  </p>
+                  {nextScan && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      in {nextScan.minutesUntil} min
+                    </p>
+                  )}
+                </div>
+                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <RefreshCw className="text-purple-400" size={24} />
+                </div>
+              </div>
+            </GlassCard>
+          </>
+        )}
       </div>
 
       {/* Chart */}
       <GlassCard delay={0.3}>
         <h2 className="text-xl font-bold text-white mb-6">Jobs Found (Last 7 Days)</h2>
         {isLoading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-gray-400">Loading chart data...</div>
-          </div>
+          <SkeletonChart />
         ) : chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={chartData}>
@@ -150,9 +159,7 @@ export default function Dashboard() {
       <GlassCard delay={0.4}>
         <h2 className="text-xl font-bold text-white mb-6">Uptime (Last 24 Hours)</h2>
         {uptimeLoading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-gray-400">Loading uptime data...</div>
-          </div>
+          <SkeletonChart />
         ) : uptime?.hourly && uptime.hourly.length > 0 ? (
           <div>
             <div className="mb-4 flex items-center gap-4">

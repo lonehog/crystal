@@ -4,10 +4,11 @@ import type { Job, Stats, ApiResponse } from '../types';
 const API_BASE = '/api';
 
 export const api = {
-  async getJobs(role?: string, limit = 100, source?: string): Promise<Job[]> {
+  async getJobs(role?: string, limit = 100, source?: string, since?: string): Promise<Job[]> {
     const params = new URLSearchParams();
     if (role) params.append('role', role);
     if (source) params.append('source', source);
+    if (since) params.append('since', since);
     params.append('limit', limit.toString());
     
     const response = await axios.get<ApiResponse<Job[]>>(
@@ -41,9 +42,12 @@ export const api = {
     return response.data.data || [];
   },
 
-  async triggerScan(): Promise<{ scanned: number }> {
+  async triggerScan(source?: 'stepstone' | 'glassdoor'): Promise<{ scanned: number }> {
+    const params = new URLSearchParams();
+    if (source) params.append('source', source);
+
     const response = await axios.get<ApiResponse<{ scanned: number }>>(
-      `${API_BASE}/scan`
+      `${API_BASE}/scan?${params.toString()}`
     );
     return response.data.data || { scanned: 0 };
   },
@@ -60,6 +64,21 @@ export const api = {
       `${API_BASE}/uptime`
     );
     return response.data.data || { totalUptimeHours: 0, serverStartTime: '', hourly: [] };
+  },
+
+  async favoriteJob(jobId: number): Promise<void> {
+    await axios.post(`${API_BASE}/jobs/${jobId}/favorite`);
+  },
+
+  async unfavoriteJob(jobId: number): Promise<void> {
+    await axios.delete(`${API_BASE}/jobs/${jobId}/favorite`);
+  },
+
+  async exportJobs(format: 'csv' | 'json' = 'json'): Promise<Blob> {
+    const response = await axios.get(`${API_BASE}/jobs/export?format=${format}`, {
+      responseType: 'blob',
+    });
+    return response.data;
   },
 };
 

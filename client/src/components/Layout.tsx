@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Rss, Settings as SettingsIcon } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { LayoutDashboard, Rss, Settings as SettingsIcon, FlaskConical } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -13,6 +12,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/feed', icon: Rss, label: 'Job Feed' },
     { path: '/settings', icon: SettingsIcon, label: 'Settings' },
+    { path: '/test', icon: FlaskConical, label: 'Test' },
   ]
 
   return (

@@ -1,0 +1,26 @@
+✅ Database initialized
+📅 Hourly cron job scheduled
+🚀 Crystal server running on http://localhost:3001
+
+🔄 Scanning Embedded Systems Engineer...
+🔍 Scraping StepStone for: Embedded Systems Engineer (embedded-software-engineer)
+📄 Scraping page 1...
+🛑 StepStone: No jobs found on page 1. Stopping pagination.
+✅ COMPLETE: StepStone for Embedded Systems Engineer
+   [PERFORMANCE] Time: 9.1s, Speed: 0.00 jobs/sec
+   [FILTERING] Processed: 0, Duplicates: 0 (NaN%)
+   [RESULTS] Inserted: 0 new jobs
+🔍 Scraping Glassdoor for: Embedded Systems Engineer (embedded-software-engineer)
+📄 Scraping Glassdoor page 1...
+   [BLOCKED] Glassdoor protection detected (403 error). Cloudflare is blocking automated requests.
+   [INFO] Glassdoor has implemented anti-bot protection. This is normal behavior.
+   [SUGGESTION] Consider using a proxy service or disabling Glassdoor scraping in settings.
+
+🔄 Scanning Embedded Systems Engineer...
+🔍 Scraping StepStone for: Embedded Systems Engineer (embedded-software-engineer)
+📄 Scraping page 1...
+🛑 StepStone: No jobs found on page 1. Stopping pagination.
+✅ COMPLETE: StepStone for Embedded Systems Engineer
+   [PERFORMANCE] Time: 3.9s, Speed: 0.00 jobs/sec
+   [FILTERING] Processed: 0, Duplicates: 0 (NaN%)
+   [RESULTS] Inserted: 0 new jobs

@@ -10,6 +10,7 @@ export interface Job {
   description?: string;
   qualifications?: string;
   source?: string;
+  is_favorite?: number;
 }
 
 export interface Stats {

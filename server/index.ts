@@ -21,7 +21,7 @@ app.use(express.json());
 // API Routes
 app.get('/api/jobs', (req, res) => {
   try {
-    const { role, limit = 1000, source } = req.query;
+    const { role, limit = 1000, source, since } = req.query;
     let query = 'SELECT * FROM jobs';
     const params: any[] = [];
     const conditions: string[] = [];
@@ -36,6 +36,11 @@ app.get('/api/jobs', (req, res) => {
       params.push(source);
     }
 
+    if (since) {
+      conditions.push('created_at > ?');
+      params.push(since);
+    }
+
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
@@ -48,6 +53,7 @@ app.get('/api/jobs', (req, res) => {
 
     res.json({ success: true, data: jobs });
   } catch (error: any) {
+    console.error(`[API ERROR]`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -252,6 +258,17 @@ app.delete('/api/roles/:role', (req, res) => {
 
 app.get('/api/scan', async (req, res) => {
   try {
+    const { source } = req.query;
+    const validSources = ['stepstone', 'glassdoor'];
+    const scanSource = source as string | undefined;
+
+    if (scanSource && !validSources.includes(scanSource)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid source specified. Must be one of: ${validSources.join(', ')}`,
+      });
+    }
+
     // Get active roles
     const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
     const result = getStmt.get('active_roles') as { value: string } | undefined;
@@ -265,20 +282,90 @@ app.get('/api/scan', async (req, res) => {
       });
     }
 
-    // Scrape all roles from both portals
+    // Scrape roles based on source filter
     let totalScraped = 0;
+    const portalsToScan = scanSource ? [scanSource] : validSources;
+    
     for (const role of roles) {
       console.log(`\n🔄 Scanning ${role}...`);
-      const stepstoneCount = await scrapeStepStone(role, db);
-      const glassdoorCount = await scrapeGlassdoor(role, db);
-      totalScraped += stepstoneCount + glassdoorCount;
+      
+      if (portalsToScan.includes('stepstone')) {
+        const stepstoneCount = await scrapeStepStone(role, db);
+        totalScraped += stepstoneCount;
+      }
+      
+      if (portalsToScan.includes('glassdoor')) {
+        const glassdoorCount = await scrapeGlassdoor(role, db);
+        totalScraped += glassdoorCount;
+      }
     }
+
+    const message = scanSource
+      ? `Scanned ${roles.length} role(s) from ${scanSource}`
+      : `Scanned ${roles.length} role(s) from both portals`;
 
     res.json({
       success: true,
-      message: `Scanned ${roles.length} role(s) from both portals`,
+      message,
       data: { scanned: totalScraped },
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Favorite jobs endpoints
+app.post('/api/jobs/:id/favorite', (req, res) => {
+  try {
+    const { id } = req.params;
+    const stmt = db.prepare('UPDATE jobs SET is_favorite = 1 WHERE id = ?');
+    stmt.run(id);
+    res.json({ success: true, message: 'Job favorited' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/jobs/:id/favorite', (req, res) => {
+  try {
+    const { id } = req.params;
+    const stmt = db.prepare('UPDATE jobs SET is_favorite = 0 WHERE id = ?');
+    stmt.run(id);
+    res.json({ success: true, message: 'Job unfavorited' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Export jobs endpoint
+app.get('/api/jobs/export', (req, res) => {
+  try {
+    const { format = 'json' } = req.query;
+    const stmt = db.prepare('SELECT * FROM jobs ORDER BY created_at DESC');
+    const jobs = stmt.all() as any[];
+
+    if (format === 'csv') {
+      const headers = ['ID', 'Title', 'Company', 'Location', 'URL', 'Source', 'Posted At', 'Created At'];
+      const csvRows = [
+        headers.join(','),
+        ...jobs.map(job => [
+          job.id,
+          `"${job.title.replace(/"/g, '""')}"`,
+          `"${job.company.replace(/"/g, '""')}"`,
+          `"${job.location.replace(/"/g, '""')}"`,
+          job.url,
+          job.source,
+          job.posted_at,
+          job.created_at
+        ].join(','))
+      ];
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=jobs.csv');
+      res.send(csvRows.join('\n'));
+    } else {
+      res.json({ success: true, data: jobs });
+    }
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

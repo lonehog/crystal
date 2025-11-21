@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, RefreshCw, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import { api } from '../lib/api'
 import GlassCard from '../components/GlassCard'
 
@@ -19,6 +20,10 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] })
       setNewRole('')
+      toast.success('Role added successfully')
+    },
+    onError: () => {
+      toast.error('Failed to add role')
     },
   })
 
@@ -26,6 +31,10 @@ export default function Settings() {
     mutationFn: api.deleteRole,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] })
+      toast.success('Role removed')
+    },
+    onError: () => {
+      toast.error('Failed to remove role')
     },
   })
 
@@ -34,7 +43,10 @@ export default function Settings() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
-      alert(`Scan completed! Found ${data.scanned} new jobs.`)
+      toast.success(`Scan completed! Found ${data.scanned} new jobs.`)
+    },
+    onError: () => {
+      toast.error('Scan failed. Please try again.')
     },
   })
 
@@ -46,7 +58,7 @@ export default function Settings() {
   }
 
   const handleDeleteRole = (role: string) => {
-    if (confirm(`Remove "${role}" from active roles?`)) {
+    if (window.confirm(`Remove "${role}" from active roles?`)) {
       deleteRoleMutation.mutate(role)
     }
   }
@@ -133,7 +145,7 @@ export default function Settings() {
             automatically every hour.
           </p>
           <button
-            onClick={() => scanMutation.mutate()}
+            onClick={() => scanMutation.mutate(undefined)}
             disabled={scanMutation.isPending || roles.length === 0}
             className="px-6 py-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >

@@ -12,8 +12,6 @@ interface JobListing {
   description: string;
   qualifications: string;
   id?: string; // For content-based duplicate detection
-  relevanceScore?: number;
-  filteredReason?: string;
 }
 
 interface ScrapingStats {
@@ -35,126 +33,6 @@ function slugify(text: string): string {
     .trim();
 }
 
-/**
- * Calculate relevance score for a job based on embedded systems keywords
- * Higher scores indicate better relevance for embedded systems roles
- */
-function calculateRelevanceScore(title: string, description: string, company: string, targetRole: string): {
-  score: number;
-  matchedKeywords: string[];
-  filteredReason?: string;
-} {
-  // Define comprehensive embedded systems keywords
-  const embeddedSystemsKeywords = [
-    // Core embedded terms
-    'embedded systems', 'embedded software', 'embedded firmware', 'embedded development',
-    'firmware development', 'firmware engineer', 'driver development', 'bootloader',
-    
-    // Hardware platforms
-    'microcontroller', 'microprocessor', 'arm', 'cortex', 'stm32', 'avr', 'pic', 'ti',
-    'arduino', 'raspberry pi', 'esp32', 'esp8266', 'beaglebone', 'nrf', 'nordic',
-    
-    // Programming languages & tools
-    'c/c++', 'assembly language', 'real-time', 'rtos', 'bare metal', 'hal',
-    'system programming', 'low level programming', 'cross compilation', 'toolchain',
-    
-    // Hardware interfaces
-    'spi', 'i2c', 'uart', 'can bus', 'ethernet', 'usb', 'gpio', 'pwm', 'adc', 'dac',
-    'hardware interface', 'peripheral driver', 'register programming',
-    
-    // System aspects
-    'real-time systems', 'deterministic', 'memory management', 'interrupt handling',
-    'power management', 'hardware abstraction', 'board support package', 'bsp',
-    
-    // Related technologies
-    'iot', 'edge computing', 'sensor fusion', 'motor control', 'power electronics',
-    'pcb', 'electronics', 'semiconductor', 'asic', 'fpga', 'verilog', 'vhdl',
-    
-    // Industry applications
-    'automotive', 'automotive embedded', 'medical devices', 'industrial control',
-    'aerospace', 'telecommunications', 'consumer electronics'
-  ];
-  
-  // Terms that typically indicate irrelevant jobs for embedded systems
-  const irrelevantTerms = [
-    'web development', 'web developer', 'frontend', 'backend', 'full stack',
-    'javascript', 'react', 'angular', 'vue', 'node.js', 'python web', 'django',
-    'mobile app', 'ios development', 'android development', 'app store',
-    'ui/ux', 'user interface', 'data science', 'machine learning', 'ai',
-    'cloud', 'aws', 'azure', 'docker', 'kubernetes', 'devops',
-    'website', 'e-commerce', 'wordpress', 'shopify', 'web design',
-    'social media', 'marketing technology', 'fintech', 'blockchain'
-  ];
-  
-  const textToAnalyze = (title + ' ' + description + ' ' + company).toLowerCase();
-  const titleLower = title.toLowerCase();
-  
-  let score = 0;
-  const matchedKeywords: string[] = [];
-  
-  // Score positive matches
-  for (const keyword of embeddedSystemsKeywords) {
-    if (textToAnalyze.includes(keyword)) {
-      const keywordScore = 1;
-      score += keywordScore;
-      matchedKeywords.push(keyword);
-      
-      // Boost score for title matches (more important)
-      if (titleLower.includes(keyword)) {
-        score += keywordScore; // Double weight for title matches
-        matchedKeywords.push(`${keyword} (title)`);
-      }
-    }
-  }
-  
-  // Penalty for irrelevant terms
-  let irrelevantMatches = 0;
-  for (const term of irrelevantTerms) {
-    if (textToAnalyze.includes(term)) {
-      score -= 2; // Strong penalty for irrelevant terms
-      irrelevantMatches++;
-    }
-  }
-  
-  // Special case: exact role matching gets high score
-  if (titleLower.includes(targetRole.toLowerCase()) || 
-      targetRole.toLowerCase().includes('embedded') && textToAnalyze.includes('embedded')) {
-    score += 3; // Bonus for role relevance
-  }
-  
-  // Determine filtering reason if score is too low
-  let filteredReason: string | undefined;
-  if (score < 2) {
-    if (irrelevantMatches > 0) {
-      filteredReason = 'Contains irrelevant terms (web/mobile/ai development)';
-    } else if (matchedKeywords.length === 0) {
-      filteredReason = 'No relevant embedded systems keywords found';
-    } else {
-      filteredReason = 'Low relevance score';
-    }
-  }
-  
-  return { score, matchedKeywords, filteredReason };
-}
-
-/**
- * Enhanced role slug generation for better search targeting
- */
-function slugifyRole(role: string): string {
-  const roleMappings: Record<string, string> = {
-    'embedded systems engineer': 'embedded-software-engineer',
-    'embedded software engineer': 'embedded-software-engineer', 
-    'firmware engineer': 'firmware-engineer',
-    'hardware engineer': 'hardware-engineer',
-    'embedded developer': 'embedded-developer',
-    'systems engineer': 'systems-engineer'
-  };
-  
-  const normalizedRole = role.toLowerCase().trim();
-  return roleMappings[normalizedRole] || 
-         normalizedRole.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-}
-
 function getRandomUserAgent(): string {
   const userAgents = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -166,6 +44,13 @@ function getRandomUserAgent(): string {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
+function getRandomProxy() {
+  // For production use - add proxy list here
+  // const proxyList = ['proxy1:port', 'proxy2:port'];
+  // return proxyList[Math.floor(Math.random() * proxyList.length)];
+  return undefined; // No proxy for development
+}
+
 async function scrapeJobDetails(jobUrl: string): Promise<{
   description: string;
   qualifications: string;
@@ -173,8 +58,10 @@ async function scrapeJobDetails(jobUrl: string): Promise<{
   try {
     const response = await axios.get(jobUrl, {
       headers: {
-        'User-Agent': getRandomUserAgent(),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
       },
       timeout: 30000,
@@ -253,7 +140,7 @@ export async function scrapeStepStone(
   role: string,
   db: Database
 ): Promise<number> {
-  const roleSlug = slugifyRole(role);
+  const roleSlug = slugify(role);
   let page = 1;
   let totalInserted = 0;
   let hasMorePages = true;
@@ -299,14 +186,16 @@ export async function scrapeStepStone(
           'Cache-Control': 'max-age=0',
           'Pragma': 'no-cache',
           'Referer': 'https://www.google.com/',
-          'Origin': 'https://www.stepstone.de',
+          'Origin': 'https://www.glassdoor.de',
         },
         timeout: 30000,
         validateStatus: function (status) {
           return status < 500;
         },
         maxRedirects: 5,
-        withCredentials: true
+        withCredentials: true,
+        // Add proxy support for production
+        // proxy: getRandomProxy()
       });
 
       // Handle 403 errors specifically
@@ -317,7 +206,7 @@ export async function scrapeStepStone(
         const retryResponse = await axios.get(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
           },
           timeout: 20000
@@ -330,7 +219,7 @@ export async function scrapeStepStone(
       const $ = cheerio.load(response.data);
       const jobs: JobListing[] = [];
 
-      // StepStone job listing selectors - enhanced for 2024
+      // StepStone job listing selectors
       $('[data-testid*="job"], .job-item, .job-card, article[class*="job"], [class*="JobCard"]').each(
         (_, element) => {
           const $el = $(element);
@@ -361,7 +250,7 @@ export async function scrapeStepStone(
               const lines = allText.split('\n').map(line => line.trim()).filter(line => line.length > 5 && !line.includes('{') && !line.includes('res-'));
               
               for (const line of lines) {
-                if (jobKeywords.test(line) && !line.includes('{') && line.length > 10 && !/^[a-zA-Z0-9-_]*$/.test(line)) {
+                if (jobKeywords.test(line) && !line.includes('{') && line.length > 10 && !/^[a-zA-Z0-9-_]+$/.test(line)) {
                   title = line;
                   break;
                 }
@@ -446,7 +335,7 @@ export async function scrapeStepStone(
             $el.find('a').first().attr('href') ||
             '';
 
-          // CRITICAL FIX: Filter out company profile URLs and get actual job posting URLs
+          // Filter out company profile URLs and get actual job posting URLs
           if (jobUrl && jobUrl.includes('/cmp/de/')) {
             // This is a company profile URL, not a job posting - skip this element
             return;
@@ -507,7 +396,7 @@ export async function scrapeStepStone(
               return; // Skip this element
             }
 
-            // CRITICAL FIX: Filter out company profile URLs
+            // Filter out company profile URLs
             if (jobUrl && jobUrl.includes('/cmp/de/')) {
               return; // Skip company profile URLs
             }
@@ -703,19 +592,10 @@ export async function scrapeGlassdoor(
   role: string,
   db: Database
 ): Promise<number> {
-  const roleSlug = slugifyRole(role);
+  const roleSlug = slugify(role);
   let page = 1;
   let totalInserted = 0;
   let hasMorePages = true;
-  
-  // Statistics for relevance filtering
-  const relevanceStats = {
-    totalJobsProcessed: 0,
-    jobsFilteredOut: 0,
-    lowRelevanceJobs: 0,
-    irrelevantTermJobs: 0,
-    relevanceScoreDistribution: new Map<number, number>()
-  };
   
   // Performance tracking
   const stats: ScrapingStats = {
@@ -736,7 +616,7 @@ export async function scrapeGlassdoor(
 
     try {
       // Enhanced delay to avoid rate limiting and bot detection
-      const delay = Math.random() * 8000 + 5000; // 5-13 seconds
+      const delay = Math.random() * 5000 + 3000; // 3-8 seconds
       await new Promise(resolve => setTimeout(resolve, delay));
       
       const response = await axios.get(url, {
@@ -760,76 +640,92 @@ export async function scrapeGlassdoor(
           'Referer': 'https://www.google.com/',
           'Origin': 'https://www.glassdoor.de',
         },
-        timeout: 45000,
+        timeout: 30000,
         validateStatus: function (status) {
           return status < 500;
         },
         maxRedirects: 5,
-        withCredentials: true
+        withCredentials: true,
+        // Add proxy support for production
+        // proxy: getRandomProxy()
       });
 
-      // Handle 403 errors specifically - Glassdoor protection
+      // Handle 403 errors specifically
       if (response.status === 403) {
-        console.error(`   [BLOCKED] Glassdoor protection detected (403 error). Cloudflare is blocking automated requests.`);
-        console.log(`   [INFO] Glassdoor has implemented anti-bot protection. This is normal behavior.`);
-        console.log(`   [SUGGESTION] Consider using a proxy service or disabling Glassdoor scraping in settings.`);
-        return 0; // Return 0 jobs instead of failing completely
+        console.warn(`   [RATE LIMIT] Received 403 for ${url}. Waiting 30 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 30000));
+        // Retry once
+        const retryResponse = await axios.get(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+          },
+          timeout: 20000
+        });
+        if (retryResponse.status === 403) {
+          throw new Error(`Rate limited after retry. Stopping scraping for ${role}.`);
+        }
       }
 
       const $ = cheerio.load(response.data);
       const jobs: JobListing[] = [];
 
-      // Check for blocking indicators
-      const pageTitle = $('title').text().toLowerCase();
-      if (pageTitle.includes('access denied') || pageTitle.includes('blocked') || pageTitle.includes('captcha')) {
-        console.error(`   [BLOCKED] Glassdoor showing blocking page. Stopping.`);
-        return 0;
-      }
-
-      // Glassdoor job listing selectors - updated for 2024
-      const jobSelectors = [
-        '[data-test="job-listing"]',
-        '.react-job-listing', 
-        '[data-test*="jobCard"]',
-        '[class*="jobCard"]',
-        '[class*="job-container"]',
-        '[class*="JobCard"]',
-        '[data-testid*="job"]',
-        'article[class*="job"]',
-        '.job-listing',
-        '[class*="job-listing"]'
-      ];
-
-      let foundJobs = false;
-      for (const selector of jobSelectors) {
-        $(selector).each((_, element) => {
+      // Glassdoor job listing selectors
+      $('[data-test="job-listing"], .react-job-listing, [class*="JobCard"], [class*="jobContainer"]').each(
+        (_, element) => {
           const $el = $(element);
-          foundJobs = true;
 
-          // Enhanced title extraction
-          let title = $el.find('[data-test="job-title"], h2, h3, a[class*="jobTitle"], [class*="JobTitle"], a').first().text().trim() ||
+          // Enhanced title extraction with better filtering
+          let title = $el.find('[data-test="job-title"], h2, h3, a[class*="jobTitle"], [class*="JobTitle"]').first().text().trim() ||
                       $el.find('a').first().text().trim();
           
-          // Clean CSS from titles
-          if (title && (title.includes('{') || title.includes('res-'))) {
+          // Enhanced CSS filtering - handle all StepStone CSS patterns
+          if (title && (title.includes('{') || title.includes('res-') || /^[a-zA-Z0-9-_]+\{/.test(title))) {
+            // Advanced CSS cleaning for StepStone patterns
             title = title
-              .replace(/^\.[a-zA-Z0-9-_]+\{/, '')
-              .replace(/\{[^}]*\}/g, '')
-              .replace(/\.[a-zA-Z0-9-_]+\{/g, '')
-              .replace(/\.[a-zA-Z0-9-_]+/g, '')
-              .replace(/@media[^{]*\{[^}]*\}/g, '')
-              .replace(/\s+/g, ' ')
+              .replace(/^\.[a-zA-Z0-9-_]+\{/, '') // Remove leading .res-xxx{
+              .replace(/\{[^}]*\}/g, '') // Remove CSS rules
+              .replace(/\.[a-zA-Z0-9-_]+\{/g, '') // Remove CSS class definitions
+              .replace(/\.[a-zA-Z0-9-_]+/g, '') // Remove remaining CSS classes
+              .replace(/@media[^{]*\{[^}]*\}/g, '') // Remove media queries
+              .replace(/\s+/g, ' ') // Normalize whitespace
               .trim();
+            
+            // Enhanced fallback: try multiple extraction strategies
+            if (title.includes('{') || title.length < 10 || /^[a-zA-Z0-9-_]*$/.test(title)) {
+              const parent = $el.closest('article, div[class*="job"], li[class*="job"], tr[class*="job"]');
+              const allText = parent.text().trim();
+              
+              // Multiple keyword patterns for better matching
+              const jobKeywords = /(Software\s+(Entwickler|Developer)|Developer|Engineer|Manager|Architect|Consultant|Analyst|Programmierer|Entwickler|Embedded|Aerospace|Hardware|Firmware|Bildverarbeitung|Angular|X\+\+|Dynamics)/i;
+              const lines = allText.split('\n').map(line => line.trim()).filter(line => line.length > 5 && !line.includes('{') && !line.includes('res-'));
+              
+              for (const line of lines) {
+                if (jobKeywords.test(line) && !line.includes('{') && line.length > 10 && !/^[a-zA-Z0-9-_]+$/.test(line)) {
+                  title = line;
+                  break;
+                }
+              }
+              
+              // Last resort: try to extract from link text
+              if (title.length < 10) {
+                const linkText = $el.find('a').first().text().trim();
+                if (linkText && jobKeywords.test(linkText) && !linkText.includes('{')) {
+                  title = linkText;
+                }
+              }
+            }
           }
 
           // Try multiple selector patterns for company
           const company =
-            $el.find('[data-test="employer-name"], [class*="employerName"], [class*="company"], [class*="Employer"]').first().text().trim() ||
+            $el.find('[data-test="employer-name"], [class*="employerName"], [class*="company"]').first().text().trim() ||
             'Unknown';
 
           // Try multiple selector patterns for location
           const location =
-            $el.find('[data-test="job-location"], [class*="location"], [class*="jobLocation"], [class*="Location"]').first().text().trim() ||
+            $el.find('[data-test="job-location"], [class*="location"], [class*="jobLocation"]').first().text().trim() ||
             'Unknown';
 
           let jobUrl =
@@ -843,11 +739,10 @@ export async function scrapeGlassdoor(
           }
 
           const postedAt =
-            $el.find('[data-test="job-age"], [class*="jobAge"], [class*="date"], time').first().text().trim() ||
+            $el.find('[data-test="job-age"], [class*="jobAge"], [class*="date"]').first().text().trim() ||
             new Date().toISOString();
 
-          // Filter out invalid jobs
-          if (title && jobUrl && title.length > 5 && !jobUrl.includes('/cmp/')) {
+          if (title && jobUrl) {
             jobs.push({
               title,
               company,
@@ -858,31 +753,18 @@ export async function scrapeGlassdoor(
               qualifications: '',
             });
           }
-        });
-        
-        if (foundJobs && jobs.length > 0) break; // Found jobs, stop trying selectors
-      }
+        }
+      );
 
       // Fallback: try to find any job links if the above doesn't work
       if (jobs.length === 0) {
         $('a[href*="/Job/"], a[href*="/job/"]').each(
           (_, element) => {
             const $el = $(element);
-            let title = $el.text().trim();
+            const title = $el.text().trim();
             const jobUrl = $el.attr('href') || '';
 
-            // Clean up CSS from titles
-            if (title && (title.includes('{') || title.includes('res-'))) {
-              title = title
-                .replace(/^\.[a-zA-Z0-9-_]+\{/, '')
-                .replace(/\{[^}]*\}/g, '')
-                .replace(/\.[a-zA-Z0-9-_]+\{/g, '')
-                .replace(/\.[a-zA-Z0-9-_]+/g, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-            }
-
-            if (title && jobUrl && title.length > 5 && !jobUrl.includes('/cmp/')) {
+            if (title && jobUrl && title.length > 10) {
               const fullUrl = jobUrl.startsWith('http')
                 ? jobUrl
                 : `https://www.glassdoor.de${jobUrl}`;
@@ -950,13 +832,13 @@ export async function scrapeGlassdoor(
       stats.duplicatesFiltered += urlDuplicates;
       
       if (urlDuplicates > 0) {
-        console.log(`   [OPTIMIZED] Skipping Glassdoor detail fetch for ${urlDuplicates} duplicate jobs.`);
+        console.log(`   [OPTIMIZED] Skipping Glassdoor detail fetch for ${urlDuplicates} duplicate jobs (${jobs.length - newJobs.length} URL + content matches).`);
       }
 
       if (newJobs.length > 0) {
         // Scrape job details for new jobs using batched concurrency
-        console.log(`📋 Fetching Glassdoor details for ${newJobs.length} NEW jobs...`);
-        const BATCH_SIZE = 3; // Reduced for Glassdoor
+        console.log(`📋 Fetching Glassdoor details for ${newJobs.length} NEW jobs (concurrently)...`);
+        const BATCH_SIZE = 5;
         for (let i = 0; i < newJobs.length; i += BATCH_SIZE) {
           const batch = newJobs.slice(i, i + BATCH_SIZE);
           await Promise.all(
@@ -964,65 +846,24 @@ export async function scrapeGlassdoor(
               const details = await scrapeJobDetails(job.url);
               job.description = details.description;
               job.qualifications = details.qualifications;
-              
-              // Calculate relevance score after getting job details
-              const relevanceResult = calculateRelevanceScore(
-                job.title, 
-                job.description || '', 
-                job.company,
-                role
-              );
-              job.relevanceScore = relevanceResult.score;
-              job.filteredReason = relevanceResult.filteredReason;
-              
-              // Track relevance statistics
-              relevanceStats.totalJobsProcessed++;
-              if (relevanceResult.filteredReason) {
-                relevanceStats.jobsFilteredOut++;
-                if (relevanceResult.filteredReason.includes('irrelevant terms')) {
-                  relevanceStats.irrelevantTermJobs++;
-                } else {
-                  relevanceStats.lowRelevanceJobs++;
-                }
-              }
-              
-              // Track score distribution
-              const scoreKey = Math.floor(relevanceResult.score);
-              relevanceStats.relevanceScoreDistribution.set(
-                scoreKey, 
-                (relevanceStats.relevanceScoreDistribution.get(scoreKey) || 0) + 1
-              );
-              
-              console.log(`   [RELEVANCE] "${job.title}" - Score: ${relevanceResult.score}, Keywords: ${relevanceResult.matchedKeywords.join(', ')}`);
-              if (relevanceResult.filteredReason) {
-                console.log(`   [FILTERED] ${relevanceResult.filteredReason}`);
-              }
             })
           );
-          // Introduce a small delay between batches
+          // Introduce a small delay between batches to avoid rate limiting
           if (i + BATCH_SIZE < newJobs.length) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        }
-        
-        // Apply relevance filtering - only keep jobs with score >= 2
-        const RELEVANCE_THRESHOLD = 2;
-        const beforeFiltering = newJobs.length;
-        newJobs = newJobs.filter(job => (job.relevanceScore || 0) >= RELEVANCE_THRESHOLD);
-        const filteredCount = beforeFiltering - newJobs.length;
-        
-        if (filteredCount > 0) {
-          console.log(`🔍 [FILTERING] Removed ${filteredCount} jobs with low relevance (score < ${RELEVANCE_THRESHOLD})`);
         }
       }
 
-      // Insert jobs into database
+      // Insert jobs into database using individual inserts (bun:sqlite compatible)
       let pageInserted = 0;
+      let duplicateCount = 0;
+      let errorCount = 0;
       
       if (newJobs.length > 0) {
         const insertStmt = db.prepare(`
-          INSERT OR IGNORE INTO jobs (title, company, location, url, posted_at, role_slug, description, qualifications, source, relevance_score, filtered_reason, matched_keywords)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT OR IGNORE INTO jobs (title, company, location, url, posted_at, role_slug, description, qualifications, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         
         for (const job of newJobs) {
@@ -1036,17 +877,19 @@ export async function scrapeGlassdoor(
               roleSlug,
               job.description,
               job.qualifications,
-              'glassdoor',
-              job.relevanceScore || 0,
-              job.filteredReason || null,
-              null // matched_keywords will be added later if needed
+              'glassdoor'
             );
             
+            // Check if insertion was successful (INSERT OR IGNORE doesn't throw on duplicates)
             if (result.changes > 0) {
               pageInserted++;
-              console.log(`   [INSERTED] ${job.title} at ${job.company} (Score: ${job.relevanceScore})`);
+              console.log(`   [INSERTED] ${job.title} at ${job.company} (role: ${roleSlug})`);
+            } else {
+              duplicateCount++;
+              console.log(`   [DUPLICATE] Skipped: ${job.title} at ${job.company}`);
             }
           } catch (error: any) {
+            errorCount++;
             console.error(`   [DB ERROR] Failed to insert job ${job.title}:`, error.message);
           }
         }
@@ -1057,22 +900,49 @@ export async function scrapeGlassdoor(
         console.log(`   [DEBUG] Total glassdoor jobs in DB for role '${roleSlug}': ${jobCount.count}`);
       }
       
+      // Log duplicates that were filtered out
+      jobs.filter(job => !newJobs.includes(job)).forEach(job => {
+        console.log(`   [DUPLICATE] Job ignored: ${job.title} (${job.url})`);
+      });
+
       totalInserted += pageInserted;
       stats.newJobsAdded += pageInserted;
       console.log(`✅ Glassdoor Page ${page}: Found ${jobs.length} jobs, inserted ${pageInserted} new ones`);
       
+      // Performance logging every 5 pages
+      if (page % 5 === 0) {
+        const elapsedTime = Date.now() - stats.startTime;
+        const jobsPerSecond = (stats.totalProcessed / (elapsedTime / 1000)).toFixed(2);
+        console.log(`   [STATS] Processed: ${stats.totalProcessed}, Duplicates: ${stats.duplicatesFiltered}, Speed: ${jobsPerSecond} jobs/sec`);
+      }
+
       // Check if there's a next page
-      const hasNextPage = $('button[aria-label*="Next"], a[aria-label*="Next"], [class*="nextButton"]').length > 0;
+      const nextPageLink = $('button[aria-label*="Next"], a[aria-label*="Next"], [class*="nextButton"]').first();
+      const hasNextPage = nextPageLink.length > 0 && !nextPageLink.hasClass('disabled') && !nextPageLink.prop('disabled');
       
-      if (!hasNextPage || page >= 5) { // Limit to 5 pages for Glassdoor
-        console.log(`🛑 Glassdoor: Reached page limit or no next page. Stopping pagination.`);
-        hasMorePages = false;
+      // Also check for pagination indicators
+      const paginationText = $('[class*="pagination"], [class*="Pagination"]').text();
+      const maxPageMatch = paginationText.match(/(\d+)\s*(?:of|von|\/)\s*(\d+)/i);
+      
+      if (maxPageMatch) {
+        const currentPage = parseInt(maxPageMatch[1]);
+        const maxPage = parseInt(maxPageMatch[2]);
+        hasMorePages = currentPage < maxPage;
+      } else if (!hasNextPage && page >= 1) {
+        // If we got jobs but no next page indicator, try one more page
+        hasMorePages = page < 10; // Safety limit: max 10 pages
       }
 
       page++;
       
+      // Safety limit: don't scrape more than 20 pages
+      if (page > 20) {
+        console.log(`🛑 Glassdoor: Reached safety limit of 20 pages. Stopping pagination.`);
+        hasMorePages = false;
+      }
+
       // Small delay between pages
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error: any) {
       console.error(`❌ Error scraping Glassdoor page ${page} for ${role}:`, error.message);
       stats.errors++;
@@ -1083,25 +953,12 @@ export async function scrapeGlassdoor(
   // Final performance report
   const totalTime = Date.now() - stats.startTime;
   const jobsPerSecond = (stats.totalProcessed / (totalTime / 1000)).toFixed(2);
-  const duplicateRate = stats.totalProcessed > 0 ? ((stats.duplicatesFiltered / stats.totalProcessed) * 100).toFixed(1) : '0.0';
+  const duplicateRate = ((stats.duplicatesFiltered / stats.totalProcessed) * 100).toFixed(1);
   
   console.log(`✅ COMPLETE: Glassdoor for ${role}`);
   console.log(`   [PERFORMANCE] Time: ${(totalTime/1000).toFixed(1)}s, Speed: ${jobsPerSecond} jobs/sec`);
   console.log(`   [FILTERING] Processed: ${stats.totalProcessed}, Duplicates: ${stats.duplicatesFiltered} (${duplicateRate}%)`);
-  console.log(`   [RELEVANCE] Total: ${relevanceStats.totalJobsProcessed}, Filtered: ${relevanceStats.jobsFilteredOut} (${relevanceStats.totalJobsProcessed > 0 ? ((relevanceStats.jobsFilteredOut / relevanceStats.totalJobsProcessed) * 100).toFixed(1) : '0.0'}%)`);
-  if (relevanceStats.irrelevantTermJobs > 0 || relevanceStats.lowRelevanceJobs > 0) {
-    console.log(`   [RELEVANCE BREAKDOWN] Irrelevant terms: ${relevanceStats.irrelevantTermJobs}, Low relevance: ${relevanceStats.lowRelevanceJobs}`);
-  }
   console.log(`   [RESULTS] Inserted: ${totalInserted} new jobs`);
-  
-  // Log relevance score distribution
-  if (relevanceStats.relevanceScoreDistribution.size > 0) {
-    const distribution = Array.from(relevanceStats.relevanceScoreDistribution.entries())
-      .sort((a, b) => b[0] - a[0])
-      .map(([score, count]) => `Score ${score}: ${count} jobs`)
-      .join(', ');
-    console.log(`   [RELEVANCE DISTRIBUTION] ${distribution}`);
-  }
   
   return totalInserted;
 }
