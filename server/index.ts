@@ -8,6 +8,9 @@ import { initDatabase } from './db';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Track server start time
+const serverStartTime = new Date();
+
 // Initialize database
 const db = initDatabase();
 
@@ -83,6 +86,92 @@ app.get('/api/stats', async (req, res) => {
         total: totalResult.count,
         last24h: yesterdayResult.count,
         daily: dailyData,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/next-scan', (req, res) => {
+  try {
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(nextHour.getHours() + 1);
+    nextHour.setMinutes(0);
+    nextHour.setSeconds(0);
+    nextHour.setMilliseconds(0);
+
+    const timeUntil = nextHour.getTime() - now.getTime();
+    const minutesUntil = Math.floor(timeUntil / 60000);
+
+    res.json({
+      success: true,
+      data: {
+        nextScan: nextHour.toISOString(),
+        minutesUntil,
+        formatted: nextHour.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/uptime', (req, res) => {
+  try {
+    const now = new Date();
+    const uptimeMs = now.getTime() - serverStartTime.getTime();
+    const uptimeHours = uptimeMs / (1000 * 60 * 60);
+
+    // Generate hourly uptime data for last 24 hours
+    const uptimeData = [];
+    const hoursAgo24 = new Date(now);
+    hoursAgo24.setHours(hoursAgo24.getHours() - 24);
+
+    for (let i = 23; i >= 0; i--) {
+      const hourTime = new Date(now);
+      hourTime.setHours(hourTime.getHours() - i);
+      hourTime.setMinutes(0);
+      hourTime.setSeconds(0);
+      hourTime.setMilliseconds(0);
+
+      // If server started before this hour, uptime is 100%, otherwise calculate percentage
+      const hourStart = hourTime.getTime();
+      const hourEnd = hourStart + 3600000; // 1 hour in ms
+      const serverStart = serverStartTime.getTime();
+
+      let uptimePercent = 100;
+      if (serverStart > hourEnd) {
+        // Server started after this hour, no uptime
+        uptimePercent = 0;
+      } else if (serverStart > hourStart) {
+        // Server started during this hour, calculate partial uptime
+        const uptimeInHour = hourEnd - serverStart;
+        uptimePercent = (uptimeInHour / 3600000) * 100;
+      }
+      // If server started before this hour, it's 100% uptime
+
+      uptimeData.push({
+        hour: hourTime.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          hour12: true,
+        }),
+        uptime: Math.round(uptimePercent),
+        timestamp: hourTime.toISOString(),
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalUptimeHours: Math.round(uptimeHours * 100) / 100,
+        serverStartTime: serverStartTime.toISOString(),
+        hourly: uptimeData,
       },
     });
   } catch (error: any) {

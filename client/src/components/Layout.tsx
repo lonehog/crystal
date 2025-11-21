@@ -26,8 +26,12 @@ export default function Layout({ children }: LayoutProps) {
       <nav className="glass fixed top-4 left-4 right-4 z-50 p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-electric-blue to-purple-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">C</span>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white/10 border border-white/20">
+              <img 
+                src="/snowflake-logo.png" 
+                alt="Crystal Logo" 
+                className="w-full h-full object-cover opacity-90"
+              />
             </div>
             <h1 className="text-xl font-bold text-white">Crystal</h1>
           </div>

@@ -11,13 +11,33 @@
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: #0B1120;
+  background-image: url('/snowflake-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: #e5e7eb;
   min-height: 100vh;
   overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(11, 17, 32, 0.70);
+  z-index: -1;
+  pointer-events: none;
 }
 
 #root {
   min-height: 100vh;
+  position: relative;
+  z-index: 1;
 }
 
 /* Glass morphism utility */

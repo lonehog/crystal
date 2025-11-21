@@ -47,5 +47,19 @@ export const api = {
     );
     return response.data.data || { scanned: 0 };
   },
+
+  async getNextScan(): Promise<{ nextScan: string; minutesUntil: number; formatted: string }> {
+    const response = await axios.get<ApiResponse<{ nextScan: string; minutesUntil: number; formatted: string }>>(
+      `${API_BASE}/next-scan`
+    );
+    return response.data.data || { nextScan: '', minutesUntil: 0, formatted: '' };
+  },
+
+  async getUptime(): Promise<{ totalUptimeHours: number; serverStartTime: string; hourly: Array<{ hour: string; uptime: number; timestamp: string }> }> {
+    const response = await axios.get<ApiResponse<{ totalUptimeHours: number; serverStartTime: string; hourly: Array<{ hour: string; uptime: number; timestamp: string }> }>>(
+      `${API_BASE}/uptime`
+    );
+    return response.data.data || { totalUptimeHours: 0, serverStartTime: '', hourly: [] };
+  },
 };
 
