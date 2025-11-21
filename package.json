@@ -1,0 +1,15 @@
+{
+  "name": "crystal",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd server dev & bun run --cwd client dev",
+    "install:all": "bun install && bun run --cwd server install && bun run --cwd client install"
+  },
+  "type": "module"
+}
+
