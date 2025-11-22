@@ -1,5 +1,4 @@
 # Crystal - Job Portal
-
 A production-ready job aggregation dashboard built with Bun 1.3, featuring a stunning glassmorphic UI.
 
 ## Features
